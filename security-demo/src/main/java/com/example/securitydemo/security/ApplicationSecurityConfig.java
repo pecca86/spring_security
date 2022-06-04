@@ -1,22 +1,18 @@
 package com.example.securitydemo.security;
 
+import com.example.securitydemo.services.ApplicationUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -25,10 +21,12 @@ import java.util.concurrent.TimeUnit;
 public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationUserService applicationUserService;
 
     @Autowired
-    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder) {
+    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder, ApplicationUserService applicationUserService) {
         this.passwordEncoder = passwordEncoder;
+        this.applicationUserService = applicationUserService;
     }
 
     @Override
@@ -77,39 +75,19 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
                     .logoutSuccessUrl("/login");
     }
 
+    // These two methods need to be implemented in order for us to use our own UserDetailService
     @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.authenticationProvider(daoAuthenticationProvider());
+    }
+
     @Bean
-    protected UserDetailsService userDetailsService() {
-        /**
-         * Specify how users are retrieved from the database
-         */
-        UserDetails anna = User.builder()
-                .username("anna")
-                .password(passwordEncoder.encode("pass")) // Encode using bcrypt, spring sec requires encoding
-//                .roles(ApplicationUserRole.STUDENT.name()) // ROLE_STUDENT
-                .authorities(ApplicationUserRole.STUDENT.getGrantedAuthorities())
-                .build();
+    public DaoAuthenticationProvider daoAuthenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setUserDetailsService(applicationUserService);
 
-        UserDetails admin = User.builder()
-                .username("adde")
-                .password(passwordEncoder.encode("admin"))
-//                .roles(ApplicationUserRole.ADMIN.name())
-                .authorities(ApplicationUserRole.ADMIN.getGrantedAuthorities())
-                .build();
-
-        UserDetails trainee_admin = User.builder()
-                .username("transu")
-                .password(passwordEncoder.encode("admin"))
-//                .roles(ApplicationUserRole.ADMIN_TRAINEE.name())
-                .authorities(ApplicationUserRole.ADMIN_TRAINEE.getGrantedAuthorities())
-                .build();
-
-        // UserDetailsService is an interface which InMemoryUserDetailsManager implements
-        return new InMemoryUserDetailsManager(
-                anna,
-                admin,
-                trainee_admin
-        );
+        return provider;
     }
 
 }
